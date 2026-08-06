@@ -28,12 +28,7 @@ export function Phase1Scrape({
   onPrev?: () => void;
 }) {
   const [input, setInput] = useState<ScrapeInput>({ niche: "", city: "", count: "" as unknown as number });
-  const [provider, setProvider] = useState<'local' | 'apify'>(() => {
-    if (typeof window !== "undefined" && (window.location.hostname.includes("vercel.app") || window.location.hostname.includes("now.sh"))) {
-      return 'apify';
-    }
-    return 'local';
-  });
+  const [provider, setProvider] = useState<'local' | 'apify'>('local');
   const [loading, setLoading] = useState(false);
   const [scrapedEmpty, setScrapedEmpty] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
