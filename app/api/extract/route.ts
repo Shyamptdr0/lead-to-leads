@@ -1,32 +1,32 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import path from 'path';
 
-puppeteer.use(StealthPlugin());
-
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
-const APIFY_ACTOR = process.env.APIFY_ACTOR ?? "compass~crawler-google-places";
-
 export async function POST(request: Request) {
   try {
     const { query, location, provider } = await request.json();
+    const APIFY_TOKEN = process.env.APIFY_TOKEN;
+    const APIFY_ACTOR = process.env.APIFY_ACTOR ?? "compass~crawler-google-places";
+    const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
     
     if (!query) {
       return NextResponse.json({ error: 'Search query is required' }, { status: 400 });
     }
 
     const searchQuery = `${query} in ${location || ''}`.trim();
-    console.log(`Starting extraction for: ${searchQuery} via ${provider || 'local'}`);
+    let effectiveProvider = provider || 'local';
+    if (isVercel && effectiveProvider === 'local' && APIFY_TOKEN) {
+      effectiveProvider = 'apify';
+    }
+    console.log(`Starting extraction for: ${searchQuery} via ${effectiveProvider}`);
 
     let searchResults: { title: string, url: string, phone?: string }[] = [];
 
-    // APIFY DISCOVERY MODE (Explicit trigger)
-    if (provider === 'apify') {
+    // APIFY DISCOVERY MODE
+    if (effectiveProvider === 'apify' || (isVercel && APIFY_TOKEN)) {
       if (!APIFY_TOKEN) {
-        return NextResponse.json({ error: 'APIFY_TOKEN missing in .env' }, { status: 400 });
+        return NextResponse.json({ error: 'APIFY_TOKEN is missing in environment variables. Please set APIFY_TOKEN in Vercel project settings.' }, { status: 400 });
       }
       try {
         console.log(`Running Apify discovery request for: ${searchQuery}`);
@@ -54,10 +54,19 @@ export async function POST(request: Request) {
         console.error("Apify extraction discovery failed:", e);
         return NextResponse.json({ success: false, error: `Apify error: ${e.message}` }, { status: 500 });
       }
+    } else if (isVercel) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Local browser scraping (Puppeteer) is not available on Vercel. Please configure APIFY_TOKEN in environment variables.' 
+      }, { status: 400 });
     } else {
-      // LOCAL PUPPETEER DISCOVERY MODE (Default)
-      const browser = await puppeteer.launch({
-        headless: 'shell', // Use headless shell to ensure absolutely no window is drawn on Windows
+      // LOCAL PUPPETEER DISCOVERY MODE (Desktop / Local Server)
+      const puppeteerExtra = (await import('puppeteer-extra')).default;
+      const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
+      puppeteerExtra.use(StealthPlugin());
+
+      const browser = await puppeteerExtra.launch({
+        headless: true,
         defaultViewport: { width: 1280, height: 800 },
         args: [
           '--no-sandbox', 
@@ -76,7 +85,7 @@ export async function POST(request: Request) {
       });
       
       const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`;
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
       try {
         await page.evaluate(() => {
@@ -92,12 +101,6 @@ export async function POST(request: Request) {
         await new Promise(r => setTimeout(r, 2000));
       } catch (err) {
         console.log("Consent check complete.");
-      }
-
-      try {
-        await page.screenshot({ path: path.join(process.cwd(), 'public', 'debug-extract.png') });
-      } catch (screenshotErr) {
-        console.log("Failed to write debug screenshot:", screenshotErr);
       }
 
       try {
