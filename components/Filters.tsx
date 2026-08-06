@@ -25,17 +25,19 @@ interface FiltersProps {
 
 export function Filters({ filters, onChange, onClear }: FiltersProps) {
   
-  const handleExperienceChange = (val: "Entry Level" | "Mid Level" | "Senior" | "all") => {
+  const handleExperienceChange = (val: string | null) => {
+    if (!val) return;
     onChange({
       ...filters,
-      experience: val === "all" ? undefined : val,
+      experience: val === "all" ? undefined : (val as "Entry Level" | "Mid Level" | "Senior"),
     });
   };
 
-  const handleTypeChange = (val: "Full Time" | "Part Time" | "Internship" | "Contract" | "all") => {
+  const handleTypeChange = (val: string | null) => {
+    if (!val) return;
     onChange({
       ...filters,
-      employmentType: val === "all" ? undefined : val,
+      employmentType: val === "all" ? undefined : (val as "Full Time" | "Part Time" | "Internship" | "Contract"),
     });
   };
 
@@ -46,10 +48,11 @@ export function Filters({ filters, onChange, onClear }: FiltersProps) {
     });
   };
 
-  const handlePostedChange = (val: "Today" | "Last 3 Days" | "Last Week" | "Last Month" | "all") => {
+  const handlePostedChange = (val: string | null) => {
+    if (!val) return;
     onChange({
       ...filters,
-      posted: val === "all" ? undefined : val,
+      posted: val === "all" ? undefined : (val as "Today" | "Last 3 Days" | "Last Week" | "Last Month"),
     });
   };
 
