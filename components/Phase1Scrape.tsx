@@ -83,23 +83,26 @@ export function Phase1Scrape({
 
             for (const line of lines) {
               if (line.startsWith('data: ')) {
+                let data: any;
                 try {
-                  const data = JSON.parse(line.slice(6));
-                  if (data.type === 'lead') {
-                    currentLeads = [...currentLeads, data.lead];
-                    setLeads(currentLeads);
-                  } else if (data.type === 'done') {
-                    if (currentLeads.length === 0) {
-                      setScrapedEmpty(true);
-                      toast.error(`0 leads found using ${selectedProvider === 'local' ? 'Local' : 'Apify'} search.`);
-                    } else {
-                      toast.success(`${currentLeads.length} leads scraped via ${selectedProvider === 'local' ? 'Local Scraper' : 'Apify Cloud'}`);
-                    }
-                  } else if (data.type === 'error') {
-                    throw new Error(data.error);
-                  }
+                  data = JSON.parse(line.slice(6));
                 } catch (e) {
-                  // ignore parse error
+                  continue;
+                }
+
+                if (data.type === 'lead') {
+                  currentLeads = [...currentLeads, data.lead];
+                  setLeads(currentLeads);
+                } else if (data.type === 'done') {
+                  if (currentLeads.length === 0) {
+                    setScrapedEmpty(true);
+                    toast.error(`0 leads found using ${selectedProvider === 'local' ? 'Local' : 'Apify'} search.`);
+                  } else {
+                    toast.success(`${currentLeads.length} leads loaded via ${selectedProvider === 'local' ? 'Local Scraper' : 'Apify Cloud'}`);
+                  }
+                } else if (data.type === 'error') {
+                  setScrapedEmpty(true);
+                  toast.error(data.error || "Scraping error occurred.");
                 }
               }
             }
